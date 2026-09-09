@@ -1,10 +1,11 @@
 package com.tvmods.tvpatcher
 
 import android.content.ComponentName
-import android.content.ServiceConnection
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.IBinder
+import android.content.ServiceConnection
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -13,7 +14,13 @@ import rikka.shizuku.Shizuku
 class MainActivity : AppCompatActivity() {
 
     companion object {
-        private const val SHIZUKU_REQUEST_CODE = 100
+        private const val SHIZUKU_REQUEST_CODE = 1401
+
+        private const val BYTEZUKU_PACKAGE =
+            "com.byteus.bytezuku"
+
+        private const val SHIZUKU_PACKAGE =
+            "moe.shizuku.privileged.api"
     }
 
     private lateinit var grantButton: Button
@@ -26,7 +33,6 @@ class MainActivity : AppCompatActivity() {
     private var patchService: IPatchService? = null
 
     private fun createServiceArgs(): Shizuku.UserServiceArgs {
-
         return Shizuku.UserServiceArgs(
             ComponentName(
                 this,
@@ -46,7 +52,6 @@ class MainActivity : AppCompatActivity() {
                 name: ComponentName?,
                 service: IBinder?
             ) {
-
                 patchService =
                     IPatchService.Stub.asInterface(
                         service
@@ -56,7 +61,6 @@ class MainActivity : AppCompatActivity() {
                     patchService != null
 
                 runOnUiThread {
-
                     updateUi()
 
                     if (serviceBound) {
@@ -74,12 +78,10 @@ class MainActivity : AppCompatActivity() {
             override fun onServiceDisconnected(
                 name: ComponentName?
             ) {
-
                 patchService = null
                 serviceBound = false
 
                 runOnUiThread {
-
                     updateUi()
 
                     setStatus(
@@ -107,7 +109,6 @@ class MainActivity : AppCompatActivity() {
                     grantResult ==
                     PackageManager.PERMISSION_GRANTED
                 ) {
-
                     patchAccessGranted = true
 
                     updateUi()
@@ -119,7 +120,6 @@ class MainActivity : AppCompatActivity() {
                     bindPatchService()
 
                 } else {
-
                     patchAccessGranted = false
 
                     updateUi()
@@ -134,7 +134,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(
         savedInstanceState: Bundle?
     ) {
-
         super.onCreate(
             savedInstanceState
         )
@@ -183,7 +182,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onResume() {
-
         super.onResume()
 
         updatePermissionState()
@@ -191,11 +189,61 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestPatchAccess() {
 
-        if (!Shizuku.pingBinder()) {
+        /*
+         * A compatible Shizuku/Bytezuku Binder is already alive.
+         * Do NOT open either manager in this case.
+         */
+        if (Shizuku.pingBinder()) {
+
+            requestShizukuPermission()
+
+            return
+        }
+
+        /*
+         * Binder is dead.
+         *
+         * Bytezuku gets priority.
+         * If Bytezuku isn't installed, try Shizuku.
+         */
+        if (isPackageInstalled(BYTEZUKU_PACKAGE)) {
 
             setStatus(
-                "Shizuku/Bytezuku is not running.\n" +
-                    "Start it first."
+                "Bytezuku is installed but its service is not running.\n" +
+                    "Opening Bytezuku..."
+            )
+
+            openPackage(
+                BYTEZUKU_PACKAGE
+            )
+
+            return
+        }
+
+        if (isPackageInstalled(SHIZUKU_PACKAGE)) {
+
+            setStatus(
+                "Shizuku is installed but its service is not running.\n" +
+                    "Opening Shizuku..."
+            )
+
+            openPackage(
+                SHIZUKU_PACKAGE
+            )
+
+            return
+        }
+
+        setStatus(
+            "No compatible privilege manager was found."
+        )
+    }
+
+    private fun requestShizukuPermission() {
+
+        if (!Shizuku.pingBinder()) {
+            setStatus(
+                "Compatible privilege service is not running."
             )
 
             return
@@ -205,7 +253,6 @@ class MainActivity : AppCompatActivity() {
             Shizuku.checkSelfPermission() ==
             PackageManager.PERMISSION_GRANTED
         ) {
-
             patchAccessGranted = true
 
             updateUi()
@@ -222,13 +269,16 @@ class MainActivity : AppCompatActivity() {
         if (
             Shizuku.shouldShowRequestPermissionRationale()
         ) {
-
             setStatus(
-                "Allow TvPatcher in Shizuku/Bytezuku."
+                "Allow TvPatcher in the privilege manager."
             )
 
             return
         }
+
+        setStatus(
+            "Requesting Patch Access..."
+        )
 
         Shizuku.requestPermission(
             SHIZUKU_REQUEST_CODE
@@ -237,26 +287,38 @@ class MainActivity : AppCompatActivity() {
 
     private fun updatePermissionState() {
 
+        if (!Shizuku.pingBinder()) {
+
+            patchAccessGranted = false
+
+            serviceBound = false
+            patchService = null
+
+            updateUi()
+
+            setStatus(
+                "Tap Grant Patch Access."
+            )
+
+            return
+        }
+
         patchAccessGranted =
-            Shizuku.pingBinder() &&
-                Shizuku.checkSelfPermission() ==
+            Shizuku.checkSelfPermission() ==
                 PackageManager.PERMISSION_GRANTED
 
         updateUi()
 
         if (patchAccessGranted) {
-
             bindPatchService()
-
-        } else {
-
-            setStatus(
-                "Waiting for Patch Access..."
-            )
         }
     }
 
     private fun bindPatchService() {
+
+        if (!Shizuku.pingBinder()) {
+            return
+        }
 
         if (!patchAccessGranted) {
             return
@@ -296,8 +358,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val service =
-            patchService
-                ?: return
+            patchService ?: return
 
         copyObbButton.isEnabled = false
         restoreCacheButton.isEnabled = false
@@ -325,7 +386,9 @@ class MainActivity : AppCompatActivity() {
 
                 updateUi()
 
-                setStatus(result)
+                setStatus(
+                    result
+                )
             }
 
         }.start()
@@ -338,8 +401,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val service =
-            patchService
-                ?: return
+            patchService ?: return
 
         copyObbButton.isEnabled = false
         restoreCacheButton.isEnabled = false
@@ -367,7 +429,9 @@ class MainActivity : AppCompatActivity() {
 
                 updateUi()
 
-                setStatus(result)
+                setStatus(
+                    result
+                )
             }
 
         }.start()
@@ -378,7 +442,7 @@ class MainActivity : AppCompatActivity() {
         if (!Shizuku.pingBinder()) {
 
             setStatus(
-                "Shizuku/Bytezuku is not running."
+                "Privilege service is not running."
             )
 
             return false
@@ -393,7 +457,10 @@ class MainActivity : AppCompatActivity() {
             return false
         }
 
-        if (!serviceBound || patchService == null) {
+        if (
+            !serviceBound ||
+            patchService == null
+        ) {
 
             setStatus(
                 "Patch service is starting..."
@@ -405,6 +472,63 @@ class MainActivity : AppCompatActivity() {
         }
 
         return true
+    }
+
+    private fun isPackageInstalled(
+        packageName: String
+    ): Boolean {
+
+        return try {
+
+            packageManager.getPackageInfo(
+                packageName,
+                0
+            )
+
+            true
+
+        } catch (_: PackageManager.NameNotFoundException) {
+
+            false
+        }
+    }
+
+    private fun openPackage(
+        packageName: String
+    ) {
+
+        try {
+
+            val intent =
+                packageManager.getLaunchIntentForPackage(
+                    packageName
+                )
+
+            if (intent == null) {
+
+                setStatus(
+                    "Could not open $packageName."
+                )
+
+                return
+            }
+
+            intent.addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK
+            )
+
+            startActivity(intent)
+
+        } catch (e: Throwable) {
+
+            setStatus(
+                "Could not open manager:\n" +
+                    (
+                        e.message
+                            ?: e.javaClass.simpleName
+                    )
+            )
+        }
     }
 
     private fun updateUi() {
@@ -425,7 +549,6 @@ class MainActivity : AppCompatActivity() {
     private fun setStatus(
         message: String
     ) {
-
         statusText.text = message
     }
 
@@ -436,6 +559,13 @@ class MainActivity : AppCompatActivity() {
         )
 
         if (serviceBound) {
+
+            try {
+
+                patchService?.destroy()
+
+            } catch (_: Throwable) {
+            }
 
             try {
 
