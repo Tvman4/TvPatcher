@@ -8,6 +8,7 @@ import java.io.FileOutputStream
 class PatchService : IPatchService.Stub() {
 
     companion object {
+
         private const val NORMAL_PACKAGE =
             "com.AnotherAxiom.GorillaTag"
 
@@ -15,16 +16,24 @@ class PatchService : IPatchService.Stub() {
             "com.TvMods.GorillaTag"
 
         private val NORMAL_OBB =
-            File("/sdcard/Android/obb/$NORMAL_PACKAGE")
+            File(
+                "/sdcard/Android/obb/$NORMAL_PACKAGE"
+            )
 
         private val MODDED_OBB =
-            File("/sdcard/Android/obb/$MODDED_PACKAGE")
+            File(
+                "/sdcard/Android/obb/$MODDED_PACKAGE"
+            )
 
         private val NORMAL_CACHE =
-            File("/sdcard/Android/data/$NORMAL_PACKAGE/cache")
+            File(
+                "/sdcard/Android/data/$NORMAL_PACKAGE/cache"
+            )
 
         private val MODDED_CACHE =
-            File("/sdcard/Android/data/$MODDED_PACKAGE/cache")
+            File(
+                "/sdcard/Android/data/$MODDED_PACKAGE/cache"
+            )
     }
 
     override fun copyObb(): String {
@@ -32,25 +41,30 @@ class PatchService : IPatchService.Stub() {
         return try {
 
             if (!NORMAL_OBB.exists()) {
+
                 return "Normal Gorilla Tag OBB folder was not found."
             }
 
-            val files = NORMAL_OBB.listFiles()
-                ?.filter {
-                    it.isFile &&
-                        it.name.endsWith(
-                            ".obb",
-                            ignoreCase = true
-                        )
-                }
-                ?: emptyList()
+            val files =
+                NORMAL_OBB.listFiles()
+                    ?.filter {
+                        it.isFile &&
+                            it.name.endsWith(
+                                ".obb",
+                                ignoreCase = true
+                            )
+                    }
+                    ?: emptyList()
 
             if (files.isEmpty()) {
+
                 return "No OBB files were found."
             }
 
             if (!MODDED_OBB.exists()) {
+
                 if (!MODDED_OBB.mkdirs()) {
+
                     return "Could not create the modded OBB folder."
                 }
             }
@@ -59,6 +73,10 @@ class PatchService : IPatchService.Stub() {
 
             for (source in files) {
 
+                /*
+                 * Replace the normal package name
+                 * with the modded package name.
+                 */
                 val destinationName =
                     source.name.replace(
                         NORMAL_PACKAGE,
@@ -94,11 +112,14 @@ class PatchService : IPatchService.Stub() {
         return try {
 
             if (!NORMAL_CACHE.exists()) {
+
                 return "Normal Gorilla Tag cache was not found."
             }
 
             if (!MODDED_CACHE.exists()) {
+
                 if (!MODDED_CACHE.mkdirs()) {
+
                     return "Could not create modded cache."
                 }
             }
@@ -166,12 +187,19 @@ class PatchService : IPatchService.Stub() {
             destination.delete()
         }
 
-        if (!temporary.renameTo(destination)) {
+        if (
+            !temporary.renameTo(
+                destination
+            )
+        ) {
 
-            // Fallback if rename fails.
-            FileInputStream(temporary).use { input ->
+            FileInputStream(
+                temporary
+            ).use { input ->
 
-                FileOutputStream(destination).use { output ->
+                FileOutputStream(
+                    destination
+                ).use { output ->
 
                     val buffer =
                         ByteArray(1024 * 1024)
