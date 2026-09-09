@@ -1,0 +1,52 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Ensure Gradle wrapper
+        run: |
+          if [ ! -f ./gradlew ]; then
+            echo "gradlew missing — generating wrapper from gradle-wrapper.properties"
+            gradle wrapper --gradle-version 9.6.0
+          fi
+          chmod +x ./gradlew
+
+      - name: Build debug + release APKs
+        run: |
+          ./gradlew --no-daemon :app:assembleDebug :app:assembleRelease
+
+      - name: Collect APKs
+        run: |
+          mkdir -p artifacts
+          find app/build/outputs/apk -name "*.apk" -exec cp -v {} artifacts/ \;
+          ls -la artifacts
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: TvPatcher-apks
+          path: artifacts/*.apk
+          if-no-files-found: error
