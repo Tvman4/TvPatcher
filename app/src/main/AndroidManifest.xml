@@ -1,33 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Required for Android 11+ package visibility when checking
+         whether the two target packages are installed. -->
     <queries>
-        <package android:name="moe.shizuku.privileged.api" />
-        <package android:name="com.byteus.bytezuku" />
+
         <package android:name="com.AnotherAxiom.GorillaTag" />
         <package android:name="com.TvMods.GorillaTag" />
+
     </queries>
 
     <application
-        android:theme="@style/Theme.TvPatcher"
+        android:allowBackup="false"
         android:label="TvPatcher"
-        android:allowBackup="true">
+        android:supportsRtl="true"
+        android:theme="@style/Theme.TvPatcher">
 
         <activity
             android:name=".MainActivity"
             android:exported="true">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
         </activity>
 
-        <!-- Required so Shizuku / ByteZuku can hand this app the binder -->
-        <provider
-            android:name="rikka.shizuku.ShizukuProvider"
-            android:authorities="${applicationId}.shizuku"
-            android:multiprocess="false"
-            android:enabled="true"
-            android:exported="true"
-            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
     </application>
+
 </manifest>
