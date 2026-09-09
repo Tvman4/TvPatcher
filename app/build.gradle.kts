@@ -1,4 +1,3 @@
-// app/build.gradle.kts
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -12,6 +11,7 @@ android {
         applicationId = "com.tvmods.tvpatcher"
         minSdk = 26
         targetSdk = 36
+
         versionCode = 3
         versionName = "1.0.0"
     }
@@ -19,12 +19,17 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+
             proguardFiles(
                 getDefaultProguardFile(
                     "proguard-android-optimize.txt"
                 ),
                 "proguard-rules.pro"
             )
+        }
+
+        debug {
+            isMinifyEnabled = false
         }
     }
 
