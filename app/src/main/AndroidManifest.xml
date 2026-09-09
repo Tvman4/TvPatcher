@@ -3,14 +3,25 @@
 <manifest
     xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <queries>
+    <!-- Shizuku-compatible API permission -->
+    <uses-permission
+        android:name="moe.shizuku.manager.permission.API_V23" />
 
+    <!-- Detect installed Gorilla Tag packages -->
+    <queries>
         <package
             android:name="com.AnotherAxiom.GorillaTag" />
 
         <package
             android:name="com.TvMods.GorillaTag" />
 
+        <!-- Bytezuku -->
+        <package
+            android:name="com.byteus.bytezuku" />
+
+        <!-- Shizuku -->
+        <package
+            android:name="moe.shizuku.privileged.api" />
     </queries>
 
     <application
@@ -19,6 +30,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TvPatcher">
 
+        <!-- Shizuku-compatible provider -->
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"
@@ -32,13 +44,11 @@
             android:exported="true">
 
             <intent-filter>
-
                 <action
                     android:name="android.intent.action.MAIN" />
 
                 <category
                     android:name="android.intent.category.LAUNCHER" />
-
             </intent-filter>
 
         </activity>
