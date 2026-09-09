@@ -1,6 +1,5 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
 }
 
 android {
@@ -9,6 +8,7 @@ android {
 
     defaultConfig {
         applicationId = "com.tvmods.tvpatcher"
+
         minSdk = 26
         targetSdk = 36
 
@@ -17,6 +17,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            isMinifyEnabled = false
+        }
+
         release {
             isMinifyEnabled = false
 
@@ -27,19 +31,11 @@ android {
                 "proguard-rules.pro"
             )
         }
-
-        debug {
-            isMinifyEnabled = false
-        }
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
     }
 }
 
