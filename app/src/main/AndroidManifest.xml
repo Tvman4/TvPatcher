@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
     <queries>
+        <package android:name="moe.shizuku.privileged.api" />
         <package android:name="com.byteus.bytezuku" />
         <package android:name="com.AnotherAxiom.GorillaTag" />
         <package android:name="com.TvMods.GorillaTag" />
@@ -9,6 +11,7 @@
         android:theme="@style/Theme.TvPatcher"
         android:label="TvPatcher"
         android:allowBackup="true">
+
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -17,5 +20,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Required so Shizuku / ByteZuku can hand this app the binder -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:multiprocess="false"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
     </application>
 </manifest>
