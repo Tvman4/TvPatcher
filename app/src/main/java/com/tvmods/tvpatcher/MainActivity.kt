@@ -1,279 +1,170 @@
 package com.tvmods.tvpatcher
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.widget.Button
-import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import kotlin.random.Random
+import rikka.shizuku.Shizuku
 
 class MainActivity : AppCompatActivity() {
 
     companion object {
-        private const val AUTH_PACKAGE =
-            "com.AnotherAxiom.GorillaTag"
-
-        private const val MOD_PACKAGE =
-            "com.TvMods.GorillaTag"
-
-        private const val MIN_LOBBY_TIME = 15_000L
-        private const val MAX_LOBBY_TIME = 30_000L
-
-        private const val UPDATE_INTERVAL = 100L
+        private const val SHIZUKU_REQUEST_CODE = 100
     }
 
-    private val handler = Handler(Looper.getMainLooper())
-
+    private lateinit var grantButton: Button
+    private lateinit var copyObbButton: Button
+    private lateinit var restoreCacheButton: Button
     private lateinit var statusText: TextView
-    private lateinit var countdownText: TextView
-    private lateinit var progressBar: ProgressBar
-    private lateinit var retryButton: Button
 
-    private var launchStarted = false
-    private var lobbyStartTime = 0L
-    private var lobbyDuration = 0L
+    private var patchAccessGranted = false
 
-    private val lobbyTicker = object : Runnable {
+    private val permissionListener =
+        Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
+            if (requestCode != SHIZUKU_REQUEST_CODE) return@OnRequestPermissionResultListener
 
-        override fun run() {
+            if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                patchAccessGranted = true
 
-            if (isFinishing || isDestroyed()) {
-                return
-            }
-
-            val elapsed =
-                System.currentTimeMillis() - lobbyStartTime
-
-            val remaining =
-                (lobbyDuration - elapsed).coerceAtLeast(0L)
-
-            val progress =
-                ((elapsed.toDouble() / lobbyDuration) * 100.0)
-                    .toInt()
-                    .coerceIn(0, 100)
-
-            progressBar.progress = progress
-
-            val seconds =
-                ((remaining + 999L) / 1000L)
-
-            countdownText.text =
-                "${seconds}s"
-
-            statusText.text =
-                if (remaining > 0) {
-                    "Waiting for lobby..."
-                } else {
-                    "Launching TvMods..."
+                runOnUiThread {
+                    updateUi()
+                    setStatus("✓ Patch access granted")
                 }
-
-            if (elapsed >= lobbyDuration) {
-
-                launchModdedGame()
-
             } else {
+                patchAccessGranted = false
 
-                handler.postDelayed(
-                    this,
-                    UPDATE_INTERVAL
-                )
+                runOnUiThread {
+                    updateUi()
+                    setStatus("Patch access was denied.")
+                }
             }
         }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContentView(R.layout.activity_main)
 
+        grantButton = findViewById(R.id.grantPatchAccess)
+        copyObbButton = findViewById(R.id.copyObb)
+        restoreCacheButton = findViewById(R.id.restoreCache)
         statusText = findViewById(R.id.statusText)
-        countdownText = findViewById(R.id.countdownText)
-        progressBar = findViewById(R.id.progressBar)
-        retryButton = findViewById(R.id.retryButton)
 
-        retryButton.setOnClickListener {
-            startAuthenticationFlow()
+        Shizuku.addRequestPermissionResultListener(permissionListener)
+
+        grantButton.setOnClickListener {
+            requestPatchAccess()
         }
 
-        retryButton.isEnabled = false
+        copyObbButton.setOnClickListener {
+            if (!checkPatchAccess()) return@setOnClickListener
 
-        startAuthenticationFlow()
+            setStatus("Copying OBB...")
+            copyObbButton.isEnabled = false
+
+            Thread {
+                val result = PatchOperations.copyObb()
+
+                runOnUiThread {
+                    copyObbButton.isEnabled = patchAccessGranted
+                    setStatus(result)
+                }
+            }.start()
+        }
+
+        restoreCacheButton.setOnClickListener {
+            if (!checkPatchAccess()) return@setOnClickListener
+
+            setStatus("Restoring cache...")
+            restoreCacheButton.isEnabled = false
+
+            Thread {
+                val result = PatchOperations.restoreCache()
+
+                runOnUiThread {
+                    restoreCacheButton.isEnabled = patchAccessGranted
+                    setStatus(result)
+                }
+            }.start()
+        }
+
+        updatePermissionState()
     }
 
-    private fun startAuthenticationFlow() {
+    override fun onResume() {
+        super.onResume()
+        updatePermissionState()
+    }
 
-        if (launchStarted) {
+    private fun requestPatchAccess() {
+        if (!Shizuku.pingBinder()) {
+            setStatus(
+                "Shizuku/Bytezuku is not running.\n" +
+                "Start it first, then try again."
+            )
             return
         }
 
-        launchStarted = true
-
-        retryButton.isEnabled = false
-
-        progressBar.progress = 0
-
-        statusText.text =
-            "Opening Gorilla Tag..."
-
-        countdownText.text =
-            "--"
-
-        val authIntent =
-            packageManager.getLaunchIntentForPackage(
-                AUTH_PACKAGE
-            )
-
-        if (authIntent == null) {
-
-            showFailure(
-                "Normal Gorilla Tag was not found."
-            )
-
+        if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
+            patchAccessGranted = true
+            updateUi()
+            setStatus("✓ Patch access already granted")
             return
         }
 
-        authIntent.addFlags(
-            Intent.FLAG_ACTIVITY_NEW_TASK
-        )
-
-        try {
-
-            /*
-             * This launches the real Gorilla Tag client.
-             *
-             * TvPatcher does not create or modify authentication
-             * credentials. The normal client performs its own
-             * authentication.
-             */
-            startActivity(authIntent)
-
-            beginLobbyTimer()
-
-        } catch (error: ActivityNotFoundException) {
-
-            showFailure(
-                "Could not open Gorilla Tag."
+        if (Shizuku.shouldShowRequestPermissionRationale()) {
+            setStatus(
+                "Patch access was previously denied.\n" +
+                "Open your Shizuku/Bytezuku manager and allow TvPatcher."
             )
-
-        } catch (error: SecurityException) {
-
-            showFailure(
-                "Android blocked the Gorilla Tag launch."
-            )
-        }
-    }
-
-    private fun beginLobbyTimer() {
-
-        handler.removeCallbacks(lobbyTicker)
-
-        lobbyDuration =
-            Random.nextLong(
-                MIN_LOBBY_TIME,
-                MAX_LOBBY_TIME + 1
-            )
-
-        lobbyStartTime =
-            System.currentTimeMillis()
-
-        statusText.text =
-            "Gorilla Tag lobby active..."
-
-        countdownText.text =
-            "${lobbyDuration / 1000}s"
-
-        progressBar.progress = 0
-
-        handler.post(lobbyTicker)
-    }
-
-    private fun launchModdedGame() {
-
-        handler.removeCallbacks(lobbyTicker)
-
-        statusText.text =
-            "Opening TvMods..."
-
-        countdownText.text =
-            "GO"
-
-        progressBar.progress = 100
-
-        val modIntent =
-            packageManager.getLaunchIntentForPackage(
-                MOD_PACKAGE
-            )
-
-        if (modIntent == null) {
-
-            showFailure(
-                "TvMods Gorilla Tag was not found."
-            )
-
             return
         }
 
-        modIntent.addFlags(
-            Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP
-        )
+        Shizuku.requestPermission(SHIZUKU_REQUEST_CODE)
+    }
 
-        try {
+    private fun updatePermissionState() {
+        patchAccessGranted =
+            Shizuku.pingBinder() &&
+            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
 
-            startActivity(modIntent)
+        updateUi()
 
-            /*
-             * TvPatcher has handed control over to the
-             * modded client.
-             */
-            handler.postDelayed(
-                {
-                    if (!isFinishing) {
-                        finish()
-                    }
-                },
-                500L
-            )
-
-        } catch (error: ActivityNotFoundException) {
-
-            showFailure(
-                "Could not open TvMods Gorilla Tag."
-            )
-
-        } catch (error: SecurityException) {
-
-            showFailure(
-                "Android blocked the TvMods launch."
-            )
+        if (!patchAccessGranted) {
+            setStatus("Waiting for patch access...")
         }
     }
 
-    private fun showFailure(message: String) {
+    private fun checkPatchAccess(): Boolean {
+        if (!Shizuku.pingBinder()) {
+            setStatus("Shizuku/Bytezuku is not running.")
+            return false
+        }
 
-        handler.removeCallbacks(lobbyTicker)
+        if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
+            patchAccessGranted = false
+            updateUi()
+            setStatus("Grant Patch Access first.")
+            return false
+        }
 
-        launchStarted = false
+        patchAccessGranted = true
+        return true
+    }
 
-        statusText.text =
-            message
+    private fun updateUi() {
+        grantButton.isEnabled = true
+        copyObbButton.isEnabled = patchAccessGranted
+        restoreCacheButton.isEnabled = patchAccessGranted
+    }
 
-        countdownText.text =
-            "!"
-
-        progressBar.progress = 0
-
-        retryButton.isEnabled = true
+    private fun setStatus(message: String) {
+        statusText.text = message
     }
 
     override fun onDestroy() {
-
-        handler.removeCallbacks(lobbyTicker)
-
+        Shizuku.removeRequestPermissionResultListener(permissionListener)
         super.onDestroy()
     }
 }
