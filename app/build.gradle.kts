@@ -4,42 +4,73 @@ plugins {
 
 android {
     namespace = "com.tvmods.tvpatcher"
+
     compileSdk = 36
 
     defaultConfig {
         applicationId = "com.tvmods.tvpatcher"
+
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.3.0"
+
+        versionCode = 4
+        versionName = "1.1.0"
+    }
+
+    buildFeatures {
+        aidl = true
     }
 
     buildTypes {
-        release {
+
+        debug {
             isMinifyEnabled = false
         }
-    }
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
+        release {
+            isMinifyEnabled = false
 
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(
-                org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+            proguardFiles(
+                getDefaultProguardFile(
+                    "proguard-android-optimize.txt"
+                ),
+                "proguard-rules.pro"
             )
         }
     }
 
-    dependencies {
-        implementation("androidx.core:core-ktx:1.17.0")
-        implementation("androidx.activity:activity-ktx:1.11.0")
-        implementation("androidx.appcompat:appcompat:1.7.1")
-        implementation("com.google.android.material:material:1.14.0")
+    compileOptions {
+        sourceCompatibility =
+            JavaVersion.VERSION_17
 
-        implementation("dev.rikka.shizuku:api:13.1.5")
-        implementation("dev.rikka.shizuku:provider:13.1.5")
+        targetCompatibility =
+            JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+
+    implementation(
+        "androidx.core:core-ktx:1.17.0"
+    )
+
+    implementation(
+        "androidx.activity:activity-ktx:1.11.0"
+    )
+
+    implementation(
+        "androidx.appcompat:appcompat:1.7.1"
+    )
+
+    implementation(
+        "com.google.android.material:material:1.14.0"
+    )
+
+    implementation(
+        "dev.rikka.shizuku:api:13.1.5"
+    )
+
+    implementation(
+        "dev.rikka.shizuku:provider:13.1.5"
+    )
 }
