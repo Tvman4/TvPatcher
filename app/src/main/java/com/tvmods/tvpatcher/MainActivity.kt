@@ -5,7 +5,6 @@ import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.IBinder
-import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -14,7 +13,7 @@ import rikka.shizuku.Shizuku
 class MainActivity : AppCompatActivity() {
 
     companion object {
-        private const val REQUEST_CODE = 100
+        private const val SHIZUKU_REQUEST_CODE = 100
     }
 
     private lateinit var grantButton: Button
@@ -23,97 +22,91 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
 
     private var patchService: IPatchService? = null
-
-    private var serviceConnection: ServiceConnection? = null
+    private var serviceBound = false
 
     private val permissionListener =
-        Shizuku.OnRequestPermissionResultListener {
-                requestCode,
-                grantResult ->
+        Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
 
-            if (requestCode != REQUEST_CODE) {
-                return@OnRequestPermissionResultListener
-            }
+            if (requestCode != SHIZUKU_REQUEST_CODE) return@OnRequestPermissionResultListener
 
             runOnUiThread {
-
-                if (
-                    grantResult ==
-                    PackageManager.PERMISSION_GRANTED
-                ) {
-                    setStatus(
-                        "✓ Patch access granted."
-                    )
-
-                    updateButtons()
-
-                    connectPatchService()
-
+                if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                    setStatus("✓ Patch access granted")
+                    updateUi()
+                    bindPatchService()
                 } else {
-
-                    setStatus(
-                        "Patch access denied."
-                    )
-
-                    updateButtons()
+                    setStatus("Patch access denied.")
+                    updateUi()
                 }
             }
         }
 
-    override fun onCreate(
-        savedInstanceState: Bundle?
-    ) {
+    private val serviceConnection = object : ServiceConnection {
+
+        override fun onServiceConnected(
+            name: ComponentName?,
+            service: IBinder?
+        ) {
+            patchService = IPatchService.Stub.asInterface(service)
+            serviceBound = true
+
+            runOnUiThread {
+                setStatus("✓ TvPatcher service ready")
+                updateUi()
+            }
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            patchService = null
+            serviceBound = false
+
+            runOnUiThread {
+                setStatus("Patch service disconnected.")
+                updateUi()
+            }
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        setContentView(
-            R.layout.activity_main
-        )
+        setContentView(R.layout.activity_main)
 
-        grantButton =
-            findViewById(R.id.grantPatchAccess)
-
-        copyObbButton =
-            findViewById(R.id.copyObb)
-
-        restoreCacheButton =
-            findViewById(R.id.restoreCache)
-
-        statusText =
-            findViewById(R.id.statusText)
+        grantButton = findViewById(R.id.grantPatchAccess)
+        copyObbButton = findViewById(R.id.copyObb)
+        restoreCacheButton = findViewById(R.id.restoreCache)
+        statusText = findViewById(R.id.statusText)
 
         grantButton.setOnClickListener {
             requestPatchAccess()
         }
 
         copyObbButton.setOnClickListener {
-            runCopyObb()
+            copyObb()
         }
 
         restoreCacheButton.setOnClickListener {
-            runRestoreCache()
+            restoreCache()
         }
 
-        Shizuku.addRequestPermissionResultListener(
-            permissionListener
-        )
+        Shizuku.addRequestPermissionResultListener(permissionListener)
 
-        updateButtons()
+        updatePermissionState()
     }
 
     override fun onResume() {
         super.onResume()
-
         updatePermissionState()
     }
 
     private fun requestPatchAccess() {
 
         if (!Shizuku.pingBinder()) {
-
             setStatus(
-                "Shizuku / Bytezuku is not running."
+                "Shizuku/Bytezuku is not running.\n" +
+                    "Start it first, then try again."
             )
-
+            updateUi()
             return
         }
 
@@ -121,241 +114,197 @@ class MainActivity : AppCompatActivity() {
             Shizuku.checkSelfPermission() ==
             PackageManager.PERMISSION_GRANTED
         ) {
-
-            setStatus(
-                "✓ Patch access already granted."
-            )
-
-            connectPatchService()
-
+            setStatus("✓ Patch access already granted")
+            updateUi()
+            bindPatchService()
             return
         }
 
-        if (
-            Shizuku.shouldShowRequestPermissionRationale()
-        ) {
-
+        if (Shizuku.shouldShowRequestPermissionRationale()) {
             setStatus(
-                "Permission was denied.\n" +
-                "Allow TvPatcher in Shizuku / Bytezuku."
+                "TvPatcher was denied access.\n" +
+                    "Allow TvPatcher in Shizuku/Bytezuku."
             )
-
+            updateUi()
             return
         }
 
-        Shizuku.requestPermission(
-            REQUEST_CODE
-        )
+        Shizuku.requestPermission(SHIZUKU_REQUEST_CODE)
     }
 
     private fun updatePermissionState() {
 
+        val granted =
+            Shizuku.pingBinder() &&
+                Shizuku.checkSelfPermission() ==
+                PackageManager.PERMISSION_GRANTED
+
+        updateUi()
+
+        if (granted) {
+            if (!serviceBound) {
+                bindPatchService()
+            }
+
+            if (!serviceBound) {
+                setStatus("Patch access granted. Starting service...")
+            }
+        } else {
+            setStatus("Waiting for Patch Access...")
+        }
+    }
+
+    private fun bindPatchService() {
+
         if (!Shizuku.pingBinder()) {
-
-            patchService = null
-
-            setStatus(
-                "Waiting for Shizuku / Bytezuku..."
-            )
-
-            updateButtons()
-
+            setStatus("Shizuku/Bytezuku is not running.")
             return
         }
 
         if (
-            Shizuku.checkSelfPermission() ==
+            Shizuku.checkSelfPermission() !=
             PackageManager.PERMISSION_GRANTED
         ) {
-
-            setStatus(
-                "✓ Patch access granted."
-            )
-
-            connectPatchService()
-
-        } else {
-
-            patchService = null
-
-            setStatus(
-                "Waiting for patch access..."
-            )
-        }
-
-        updateButtons()
-    }
-
-    private fun connectPatchService() {
-
-        if (patchService != null) {
-            updateButtons()
+            setStatus("Grant Patch Access first.")
+            updateUi()
             return
         }
 
-        val args =
-            Shizuku.UserServiceArgs(
+        if (serviceBound) return
+
+        try {
+
+            val args = Shizuku.UserServiceArgs(
                 ComponentName(
                     this,
                     PatchService::class.java
                 )
             )
                 .daemon(false)
-                .processName("patch")
-                .debuggable(BuildConfig.DEBUG)
-                .version(1)
+                .tag("TvPatcher")
 
-        serviceConnection =
-            object : ServiceConnection {
-
-                override fun onServiceConnected(
-                    name: ComponentName?,
-                    binder: IBinder?
-                ) {
-
-                    patchService =
-                        IPatchService.Stub.asInterface(
-                            binder
-                        )
-
-                    runOnUiThread {
-                        setStatus(
-                            "✓ Patch service ready."
-                        )
-
-                        updateButtons()
-                    }
-                }
-
-                override fun onServiceDisconnected(
-                    name: ComponentName?
-                ) {
-
-                    patchService = null
-
-                    runOnUiThread {
-                        setStatus(
-                            "Patch service disconnected."
-                        )
-
-                        updateButtons()
-                    }
-                }
-            }
-
-        try {
+            /*
+             * Shizuku 13.1.x exposes processName as a
+             * Java property rather than processName(...).
+             */
+            args.processName = "tvpatcher"
 
             Shizuku.bindUserService(
                 args,
-                serviceConnection!!
+                serviceConnection
             )
 
-            setStatus(
-                "Starting patch service..."
-            )
+            setStatus("Starting patch service...")
 
         } catch (e: Exception) {
 
-            patchService = null
-
             setStatus(
-                "Could not start patch service:\n" +
-                "${e.message ?: "Unknown error"}"
+                "Failed to start patch service:\n" +
+                    (e.message ?: e.javaClass.simpleName)
             )
         }
     }
 
-    private fun runCopyObb() {
+    private fun checkService(): Boolean {
 
-        val service = patchService
-
-        if (service == null) {
-            setStatus(
-                "Grant Patch Access first."
-            )
-            return
+        if (!Shizuku.pingBinder()) {
+            setStatus("Shizuku/Bytezuku is not running.")
+            updateUi()
+            return false
         }
 
-        setWorking(true)
+        if (
+            Shizuku.checkSelfPermission() !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            setStatus("Grant Patch Access first.")
+            updateUi()
+            return false
+        }
+
+        if (!serviceBound || patchService == null) {
+            setStatus("Patch service is starting...")
+            bindPatchService()
+            return false
+        }
+
+        return true
+    }
+
+    private fun copyObb() {
+
+        if (!checkService()) return
+
+        copyObbButton.isEnabled = false
+        restoreCacheButton.isEnabled = false
+        setStatus("Copying OBB...")
 
         Thread {
 
-            val result =
-                try {
-                    service.copyObb()
-                } catch (e: Exception) {
-                    "ERROR: ${e.message ?: "Copy failed."}"
-                }
+            val result = try {
+                patchService?.copyObb()
+                    ?: "Patch service unavailable."
+            } catch (e: Exception) {
+                "OBB copy failed:\n${e.message ?: e.javaClass.simpleName}"
+            }
 
             runOnUiThread {
 
-                setWorking(false)
+                copyObbButton.isEnabled = serviceBound
+                restoreCacheButton.isEnabled = serviceBound
+
                 setStatus(result)
             }
 
         }.start()
     }
 
-    private fun runRestoreCache() {
+    private fun restoreCache() {
 
-        val service = patchService
+        if (!checkService()) return
 
-        if (service == null) {
-            setStatus(
-                "Grant Patch Access first."
-            )
-            return
-        }
-
-        setWorking(true)
+        copyObbButton.isEnabled = false
+        restoreCacheButton.isEnabled = false
+        setStatus("Restoring cache...")
 
         Thread {
 
-            val result =
-                try {
-                    service.restoreCache()
-                } catch (e: Exception) {
-                    "ERROR: ${e.message ?: "Restore failed."}"
-                }
+            val result = try {
+                patchService?.restoreCache()
+                    ?: "Patch service unavailable."
+            } catch (e: Exception) {
+                "Cache restore failed:\n${e.message ?: e.javaClass.simpleName}"
+            }
 
             runOnUiThread {
 
-                setWorking(false)
+                copyObbButton.isEnabled = serviceBound
+                restoreCacheButton.isEnabled = serviceBound
+
                 setStatus(result)
             }
 
         }.start()
     }
 
-    private fun setWorking(
-        working: Boolean
-    ) {
-        grantButton.isEnabled = !working
-        copyObbButton.isEnabled = !working &&
-                patchService != null
-        restoreCacheButton.isEnabled = !working &&
-                patchService != null
-    }
+    private fun updateUi() {
 
-    private fun updateButtons() {
+        val permissionGranted =
+            Shizuku.pingBinder() &&
+                Shizuku.checkSelfPermission() ==
+                PackageManager.PERMISSION_GRANTED
 
-        val ready =
-            patchService != null
+        grantButton.isEnabled = true
 
         copyObbButton.isEnabled =
-            ready
+            permissionGranted && serviceBound
 
         restoreCacheButton.isEnabled =
-            ready
-
-        grantButton.isEnabled =
-            true
+            permissionGranted && serviceBound
     }
 
-    private fun setStatus(
-        text: String
-    ) {
-        statusText.text = text
+    private fun setStatus(message: String) {
+        statusText.text = message
     }
 
     override fun onDestroy() {
@@ -364,34 +313,29 @@ class MainActivity : AppCompatActivity() {
             permissionListener
         )
 
-        val connection =
-            serviceConnection
-
-        if (connection != null) {
-
+        if (serviceBound) {
             try {
-
-                val args =
-                    Shizuku.UserServiceArgs(
-                        ComponentName(
-                            this,
-                            PatchService::class.java
-                        )
+                val args = Shizuku.UserServiceArgs(
+                    ComponentName(
+                        this,
+                        PatchService::class.java
                     )
-                        .daemon(false)
-                        .processName("patch")
-                        .version(1)
+                )
+                    .daemon(false)
+                    .tag("TvPatcher")
+
+                args.processName = "tvpatcher"
 
                 Shizuku.unbindUserService(
                     args,
-                    connection,
+                    serviceConnection,
                     true
                 )
-
             } catch (_: Exception) {
             }
         }
 
+        serviceBound = false
         patchService = null
 
         super.onDestroy()
