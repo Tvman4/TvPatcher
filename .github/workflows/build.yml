@@ -2,13 +2,18 @@ name: Build APK
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+
   pull_request:
-    branches: [main]
+    branches:
+      - main
+
   workflow_dispatch:
 
 jobs:
   build:
+    name: Build TvPatcher
     runs-on: ubuntu-latest
 
     permissions:
@@ -23,38 +28,70 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+          cache: gradle
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
       - name: Ensure Gradle wrapper
+        shell: bash
         run: |
-          if [ ! -f ./gradlew ]; then
-            echo "gradlew missing — generating Gradle 9.5 wrapper"
-            gradle wrapper --gradle-version 9.5
+          set -e
+
+          if [ ! -f "./gradlew" ]; then
+            echo "gradlew missing — generating Gradle 9.7.1 wrapper"
+
+            gradle wrapper \
+              --gradle-version 9.7.1 \
+              --distribution-type bin
           fi
 
           chmod +x ./gradlew
 
-      - name: Show Gradle version
-        run: ./gradlew --version
-
-      - name: Build debug + release APKs
+      - name: Verify Gradle version
+        shell: bash
         run: |
-          ./gradlew --no-daemon \
-            :app:assembleDebug \
+          ./gradlew --version
+
+      - name: Clean build
+        shell: bash
+        run: |
+          ./gradlew \
+            --no-daemon \
+            --stacktrace \
+            clean
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          ./gradlew \
+            --no-daemon \
+            --stacktrace \
+            :app:assembleDebug
+
+      - name: Build release APK
+        shell: bash
+        run: |
+          ./gradlew \
+            --no-daemon \
+            --stacktrace \
             :app:assembleRelease
 
       - name: Collect APKs
+        shell: bash
         run: |
+          set -e
+
           mkdir -p artifacts
 
           find app/build/outputs/apk \
             -type f \
             -name "*.apk" \
+            -print \
             -exec cp -v {} artifacts/ \;
 
-          echo "Built APKs:"
+          echo ""
+          echo "===== APK ARTIFACTS ====="
           ls -lah artifacts
 
       - name: Upload APKs
@@ -63,3 +100,4 @@ jobs:
           name: TvPatcher-apks
           path: artifacts/*.apk
           if-no-files-found: error
+          retention-days: 14
