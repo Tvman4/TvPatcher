@@ -1,66 +1,103 @@
 <?xml version="1.0" encoding="utf-8"?>
-
-<androidx.constraintlayout.widget.ConstraintLayout
+<ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:padding="28dp">
+    android:layout_height="match_parent">
 
-    <TextView
-        android:id="@+id/titleText"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="TvPatcher"
-        android:textSize="32sp"
-        android:textStyle="bold"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        android:orientation="vertical"
+        android:padding="24dp">
 
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
-        android:text="Starting..."
-        android:textSize="18sp"
-        app:layout_constraintTop_toBottomOf="@id/titleText"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="TvPatcher"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="28dp"/>
 
-    <TextView
-        android:id="@+id/countdownText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:text="--"
-        android:textSize="42sp"
-        android:textStyle="bold"
-        app:layout_constraintTop_toBottomOf="@id/statusText"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="PATCH ACCESS"
+            android:textStyle="bold"
+            android:textSize="14sp"
+            android:layout_marginBottom="8dp"/>
 
-    <ProgressBar
-        android:id="@+id/progressBar"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="0dp"
-        android:layout_height="12dp"
-        android:layout_marginTop="28dp"
-        android:max="100"
-        android:progress="0"
-        app:layout_constraintTop_toBottomOf="@id/countdownText"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        <Button
+            android:id="@+id/grantPatchAccess"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="GRANT PATCH ACCESS"/>
 
-    <Button
-        android:id="@+id/retryButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
-        android:text="Retry"
-        app:layout_constraintTop_toBottomOf="@id/progressBar"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="28dp"/>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="PATCH TOOLS"
+            android:textStyle="bold"
+            android:textSize="14sp"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/copyObb"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="COPY OBB"/>
+
+        <Button
+            android:id="@+id/restoreCache"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="RESTORE CACHE"
+            android:layout_marginTop="10dp"/>
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="28dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="NEEDS AUTH"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:gravity="center"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="GO INTO GTAG AND STAY IN A LOBBY FOR 15–30 SECONDS FOR AUTH"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:layout_marginTop="6dp"/>
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="28dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="STATUS"
+            android:textStyle="bold"
+            android:textSize="14sp"/>
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Waiting for patch access..."
+            android:textSize="15sp"
+            android:padding="12dp"
+            android:layout_marginTop="6dp"/>
+
+    </LinearLayout>
+
+</ScrollView>
