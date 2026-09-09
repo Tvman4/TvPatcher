@@ -1,178 +1,279 @@
 package com.tvmods.tvpatcher
 
-import android.content.pm.PackageManager
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Button
-import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
-import androidx.activity.ComponentActivity
-import rikka.shizuku.Shizuku
+import androidx.appcompat.app.AppCompatActivity
+import kotlin.random.Random
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
-    private lateinit var status: TextView
-    private lateinit var auth: TextView
+    companion object {
+        private const val AUTH_PACKAGE =
+            "com.AnotherAxiom.GorillaTag"
 
-    private val shizukuPackage = "moe.shizuku.privileged.api"
-    private val bytezukuPackage = "com.byteus.bytezuku"
-    private val normalPackage = "com.AnotherAxiom.GorillaTag"
-    private val modPackage = "com.TvMods.GorillaTag"
+        private const val MOD_PACKAGE =
+            "com.TvMods.GorillaTag"
 
-    private val requestCode = 1001
+        private const val MIN_LOBBY_TIME = 15_000L
+        private const val MAX_LOBBY_TIME = 30_000L
 
-    private val binderReceived = Shizuku.OnBinderReceivedListener { refresh() }
-    private val binderDead = Shizuku.OnBinderDeadListener { refresh() }
-    private val permResult = Shizuku.OnRequestPermissionResultListener { code, result ->
-        if (code == requestCode) refresh()
-        if (code == requestCode && result == PackageManager.PERMISSION_GRANTED) {
-            auth.text = "Auth: granted"
+        private const val UPDATE_INTERVAL = 100L
+    }
+
+    private val handler = Handler(Looper.getMainLooper())
+
+    private lateinit var statusText: TextView
+    private lateinit var countdownText: TextView
+    private lateinit var progressBar: ProgressBar
+    private lateinit var retryButton: Button
+
+    private var launchStarted = false
+    private var lobbyStartTime = 0L
+    private var lobbyDuration = 0L
+
+    private val lobbyTicker = object : Runnable {
+
+        override fun run() {
+
+            if (isFinishing || isDestroyed()) {
+                return
+            }
+
+            val elapsed =
+                System.currentTimeMillis() - lobbyStartTime
+
+            val remaining =
+                (lobbyDuration - elapsed).coerceAtLeast(0L)
+
+            val progress =
+                ((elapsed.toDouble() / lobbyDuration) * 100.0)
+                    .toInt()
+                    .coerceIn(0, 100)
+
+            progressBar.progress = progress
+
+            val seconds =
+                ((remaining + 999L) / 1000L)
+
+            countdownText.text =
+                "${seconds}s"
+
+            statusText.text =
+                if (remaining > 0) {
+                    "Waiting for lobby..."
+                } else {
+                    "Launching TvMods..."
+                }
+
+            if (elapsed >= lobbyDuration) {
+
+                launchModdedGame()
+
+            } else {
+
+                handler.postDelayed(
+                    this,
+                    UPDATE_INTERVAL
+                )
+            }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(40, 48, 40, 40)
+        setContentView(R.layout.activity_main)
+
+        statusText = findViewById(R.id.statusText)
+        countdownText = findViewById(R.id.countdownText)
+        progressBar = findViewById(R.id.progressBar)
+        retryButton = findViewById(R.id.retryButton)
+
+        retryButton.setOnClickListener {
+            startAuthenticationFlow()
         }
 
-        val title = TextView(this).apply {
-            text = "TvPatcher"
-            textSize = 28f
-        }
+        retryButton.isEnabled = false
 
-        status = TextView(this).apply {
-            textSize = 16f
-            setPadding(0, 24, 0, 24)
-        }
-
-        auth = TextView(this).apply {
-            textSize = 16f
-            setPadding(0, 8, 0, 24)
-        }
-
-        val grant = Button(this).apply {
-            text = "Authorize (Shizuku / ByteZuku)"
-            setOnClickListener { requestAuth() }
-        }
-
-        val openHelper = Button(this).apply {
-            text = "Open Shizuku / ByteZuku"
-            setOnClickListener { openHelperApp() }
-        }
-
-        val openNormal = Button(this).apply {
-            text = "Open normal Gorilla Tag"
-            setOnClickListener { launch(normalPackage) }
-        }
-
-        val openMod = Button(this).apply {
-            text = "Open modded Gorilla Tag"
-            setOnClickListener { launch(modPackage) }
-        }
-
-        root.addView(title)
-        root.addView(status)
-        root.addView(auth)
-        root.addView(grant)
-        root.addView(openHelper)
-        root.addView(openNormal)
-        root.addView(openMod)
-        setContentView(root)
-
-        Shizuku.addBinderReceivedListenerSticky(binderReceived)
-        Shizuku.addBinderDeadListener(binderDead)
-        Shizuku.addRequestPermissionResultListener(permResult)
-        refresh()
+        startAuthenticationFlow()
     }
 
-    override fun onResume() {
-        super.onResume()
-        refresh()
+    private fun startAuthenticationFlow() {
+
+        if (launchStarted) {
+            return
+        }
+
+        launchStarted = true
+
+        retryButton.isEnabled = false
+
+        progressBar.progress = 0
+
+        statusText.text =
+            "Opening Gorilla Tag..."
+
+        countdownText.text =
+            "--"
+
+        val authIntent =
+            packageManager.getLaunchIntentForPackage(
+                AUTH_PACKAGE
+            )
+
+        if (authIntent == null) {
+
+            showFailure(
+                "Normal Gorilla Tag was not found."
+            )
+
+            return
+        }
+
+        authIntent.addFlags(
+            Intent.FLAG_ACTIVITY_NEW_TASK
+        )
+
+        try {
+
+            /*
+             * This launches the real Gorilla Tag client.
+             *
+             * TvPatcher does not create or modify authentication
+             * credentials. The normal client performs its own
+             * authentication.
+             */
+            startActivity(authIntent)
+
+            beginLobbyTimer()
+
+        } catch (error: ActivityNotFoundException) {
+
+            showFailure(
+                "Could not open Gorilla Tag."
+            )
+
+        } catch (error: SecurityException) {
+
+            showFailure(
+                "Android blocked the Gorilla Tag launch."
+            )
+        }
+    }
+
+    private fun beginLobbyTimer() {
+
+        handler.removeCallbacks(lobbyTicker)
+
+        lobbyDuration =
+            Random.nextLong(
+                MIN_LOBBY_TIME,
+                MAX_LOBBY_TIME + 1
+            )
+
+        lobbyStartTime =
+            System.currentTimeMillis()
+
+        statusText.text =
+            "Gorilla Tag lobby active..."
+
+        countdownText.text =
+            "${lobbyDuration / 1000}s"
+
+        progressBar.progress = 0
+
+        handler.post(lobbyTicker)
+    }
+
+    private fun launchModdedGame() {
+
+        handler.removeCallbacks(lobbyTicker)
+
+        statusText.text =
+            "Opening TvMods..."
+
+        countdownText.text =
+            "GO"
+
+        progressBar.progress = 100
+
+        val modIntent =
+            packageManager.getLaunchIntentForPackage(
+                MOD_PACKAGE
+            )
+
+        if (modIntent == null) {
+
+            showFailure(
+                "TvMods Gorilla Tag was not found."
+            )
+
+            return
+        }
+
+        modIntent.addFlags(
+            Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP
+        )
+
+        try {
+
+            startActivity(modIntent)
+
+            /*
+             * TvPatcher has handed control over to the
+             * modded client.
+             */
+            handler.postDelayed(
+                {
+                    if (!isFinishing) {
+                        finish()
+                    }
+                },
+                500L
+            )
+
+        } catch (error: ActivityNotFoundException) {
+
+            showFailure(
+                "Could not open TvMods Gorilla Tag."
+            )
+
+        } catch (error: SecurityException) {
+
+            showFailure(
+                "Android blocked the TvMods launch."
+            )
+        }
+    }
+
+    private fun showFailure(message: String) {
+
+        handler.removeCallbacks(lobbyTicker)
+
+        launchStarted = false
+
+        statusText.text =
+            message
+
+        countdownText.text =
+            "!"
+
+        progressBar.progress = 0
+
+        retryButton.isEnabled = true
     }
 
     override fun onDestroy() {
-        Shizuku.removeBinderReceivedListener(binderReceived)
-        Shizuku.removeBinderDeadListener(binderDead)
-        Shizuku.removeRequestPermissionResultListener(permResult)
+
+        handler.removeCallbacks(lobbyTicker)
+
         super.onDestroy()
-    }
-
-    private fun requestAuth() {
-        if (!installed(shizukuPackage) && !installed(bytezukuPackage)) {
-            auth.text = "Auth: install Shizuku or ByteZuku first"
-            return
-        }
-        if (!Shizuku.pingBinder()) {
-            auth.text = "Auth: helper installed but service is not running.\nOpen Shizuku/ByteZuku and start it (wireless debugging / ADB), then tap Authorize again."
-            openHelperApp()
-            return
-        }
-        if (Shizuku.isPreV11()) {
-            auth.text = "Auth: helper version is too old (need v11+)"
-            return
-        }
-        if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
-            auth.text = "Auth: already granted (uid ${safeUid()})"
-            return
-        }
-        Shizuku.requestPermission(requestCode)
-        auth.text = "Auth: waiting for the allow prompt…"
-    }
-
-    private fun refresh() {
-        status.text = buildStatus()
-        auth.text = "Auth: ${authState()}"
-    }
-
-    private fun authState(): String {
-        val helpers = buildString {
-            append(if (installed(shizukuPackage)) "Shizuku installed" else "Shizuku missing")
-            append(" / ")
-            append(if (installed(bytezukuPackage)) "ByteZuku installed" else "ByteZuku missing")
-        }
-        if (!Shizuku.pingBinder()) return "$helpers — service not running"
-        if (Shizuku.isPreV11()) return "$helpers — too old"
-        return if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
-            "$helpers — GRANTED (uid ${safeUid()})"
-        } else {
-            "$helpers — service up, not granted yet"
-        }
-    }
-
-    private fun safeUid(): String = try {
-        Shizuku.getUid().toString()
-    } catch (_: Throwable) {
-        "?"
-    }
-
-    private fun buildStatus(): String {
-        return "Shizuku pkg: ${if (installed(shizukuPackage)) "found" else "not found"}\n" +
-            "ByteZuku pkg: ${if (installed(bytezukuPackage)) "found" else "not found"}\n" +
-            "Normal GTAG: ${if (installed(normalPackage)) "found" else "not found"}\n" +
-            "Modded GTAG: ${if (installed(modPackage)) "found" else "not found"}"
-    }
-
-    private fun openHelperApp() {
-        when {
-            installed(bytezukuPackage) -> launch(bytezukuPackage)
-            installed(shizukuPackage) -> launch(shizukuPackage)
-            else -> auth.text = "Auth: neither helper is installed"
-        }
-    }
-
-    private fun installed(pkg: String): Boolean =
-        try {
-            packageManager.getPackageInfo(pkg, 0)
-            true
-        } catch (_: PackageManager.NameNotFoundException) {
-            false
-        }
-
-    private fun launch(pkg: String) {
-        val intent = packageManager.getLaunchIntentForPackage(pkg)
-        if (intent != null) startActivity(intent)
-        else status.text = "Unable to launch $pkg"
     }
 }
