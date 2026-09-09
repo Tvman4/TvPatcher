@@ -10,6 +10,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
 
@@ -29,20 +30,32 @@ jobs:
       - name: Ensure Gradle wrapper
         run: |
           if [ ! -f ./gradlew ]; then
-            echo "gradlew missing — generating wrapper from gradle-wrapper.properties"
-            gradle wrapper --gradle-version 9.6.0
+            echo "gradlew missing — generating Gradle 9.5 wrapper"
+            gradle wrapper --gradle-version 9.5
           fi
+
           chmod +x ./gradlew
+
+      - name: Show Gradle version
+        run: ./gradlew --version
 
       - name: Build debug + release APKs
         run: |
-          ./gradlew --no-daemon :app:assembleDebug :app:assembleRelease
+          ./gradlew --no-daemon \
+            :app:assembleDebug \
+            :app:assembleRelease
 
       - name: Collect APKs
         run: |
           mkdir -p artifacts
-          find app/build/outputs/apk -name "*.apk" -exec cp -v {} artifacts/ \;
-          ls -la artifacts
+
+          find app/build/outputs/apk \
+            -type f \
+            -name "*.apk" \
+            -exec cp -v {} artifacts/ \;
+
+          echo "Built APKs:"
+          ls -lah artifacts
 
       - name: Upload APKs
         uses: actions/upload-artifact@v4
