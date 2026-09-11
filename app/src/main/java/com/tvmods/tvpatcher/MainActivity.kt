@@ -25,7 +25,7 @@ class MainActivity : AppCompatActivity() {
         private const val BYTEZUKU_PACKAGE = "com.byteus.bytezuku"
         private const val SHIZUKU_PACKAGE = "moe.shizuku.privileged.api"
         // Set this to the HTTPS address of the companion bot/API service.
-        private const val API_BASE_URL = "https://YOUR-BOT-HOST.example"
+        private const val API_BASE_URL = "https://tvbot-pvr5.onrender.com/"
         private const val META_LOGIN_URL = "https://auth.meta.com/?waterfall_id=1993c91a-485b-4c6d-bd41-bfc56f7da725&redirect_uri=https%3A%2F%2Fauth.meta.com%2Foidc%2F%3Fapp_id%3D800455417652954%26nonce%3DAdSAgq5Gh_Dp33ZBlbTC-n4Aopo%26redirect_uri%3Dhttps%253A%252F%252Fwww.meta.com%252Foidc%252Fcallback%252F%26response_type%3Dcode%26scope%3Dopenid%26state%3DATpyaIjyxxG0eW3TFA5F7o9XQo5w6mdVSvglhCzV7IzyI6lCmFjVeIWUR-TmcuBJL67prPDu-LP4Cq20XShReIm2PJ6PuPNknLXAr5tduLsXwtHQrJI36x2zcVC8X4P92rAwpimuQr4pVTA2alszzj82i-Yy__VF2cX8Jn69jAnuExQUGRMJ6r_R2ZnVZRESJ4da0u4EHJfy4OUEbFobr7qvy8d59lkQXGeG_FBgvzFrwUXbUOOIAB4GZEoax-wiVonkJA86VB4_TZnyvWlRBZNHtIugtDvm4N6OMb_pvhaXK49FeEy0yYUc6aF_PvnZsn52V4FWBnet8Ngrq2aJXmippW5ecx%26waterfall_id%3D1993c91a-485b-4c6d-bd41-bfc56f7da725&source_app_id=800455417652954&utm_source=meta.com&force_reauth=0"
     }
 
